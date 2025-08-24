@@ -42,7 +42,8 @@ function App() {
   const onSocketClose = useCallback(() => {
     console.log("onSocketClose");
     //stopStreaming();
-  }, []);
+    stopPlayingAudio();
+  }, [stopPlayingAudio]);
 
   const onReadyToReceiveAudio = useCallback(() => {
     //startStreaming();
@@ -56,6 +57,7 @@ function App() {
     sendBase64AudioStringChunk,
     isAiResponseInProgress,
     isInitialized,
+    transcription,
   } = useOpenAiRealTime({
     instructions: "You are a helpful assistant.",
     onMessageReceived: enqueueMessage,
@@ -95,7 +97,7 @@ function App() {
   );
 
   const { isStreaming, startStreaming, stopStreaming } = useAudioStreamer({
-    sampleRate: 24000, // e.g., 16kHz
+    sampleRate: 16000, // e.g., 16kHz - // TODO : The documentation doesn't specify the exact requirements for this. It tried 16K and 24K. I think 16k is better.
     interval: 250, // emit every 250 milliseconds
     onAudioChunk: onAudioStreamerChunk,
   });
@@ -122,7 +124,8 @@ function App() {
       console.log("Stopping audio streaming");
       stopStreaming();
     }
-  }, [isWebSocketConnected, startStreaming, stopStreaming, isInitialized]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWebSocketConnected, isInitialized]);
 
   return (
     <div
@@ -134,6 +137,7 @@ function App() {
         gap: 16,
         display: "flex",
         flexDirection: "column",
+        padding: 16,
       }}
     >
       <div>
@@ -166,6 +170,12 @@ function App() {
           Log Messages
         </button>
       </div>
+      <hr />
+
+      <div>
+        <h2 className=" text-[30px] font-bold">Transcription:</h2>
+        <p>{transcription}</p>
+      </div>
 
       <hr />
 
@@ -187,8 +197,9 @@ function App() {
         {isStreaming && (
           <button onClick={playAudioRecorderChunks}>Play Stream</button>
         )}
-        <p>Is Streaming: {isStreaming ? "Yes" : "No"}</p>
+        <br />
       </div>
+      <p>Is Streaming: {isStreaming ? "Yes" : "No"}</p>
     </div>
   );
 }

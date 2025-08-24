@@ -23,7 +23,7 @@ const useOpenAiRealTime = ({
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAiResponseInProgress, setIsAiResponseInProgress] = useState(false);
-
+  const [transcription, setTranscription] = useState<string>("");
   const responseQueueRef = useRef<string[]>([]);
 
   const resetHookState = useCallback(() => {
@@ -33,6 +33,7 @@ const useOpenAiRealTime = ({
     setIsInitialized(false);
     responseQueueRef.current = [];
     setIsAiResponseInProgress(false);
+    setTranscription("");
   }, []);
 
   const connectWebSocket = useCallback(
@@ -76,6 +77,7 @@ const useOpenAiRealTime = ({
           onMessageReceived(messageObject);
           if (messageObject.type === "response.created") {
             setIsAiResponseInProgress(true);
+            setTranscription("");
           }
           if (messageObject.type === "response.audio.done") {
             setIsAiResponseInProgress(false);
@@ -97,6 +99,9 @@ const useOpenAiRealTime = ({
           if (messageObject.type === "session.updated") {
             setIsInitialized(true);
             onReadyToReceiveAudio();
+          }
+          if (messageObject.type === "response.audio_transcript.delta") {
+            setTranscription((prev) => prev + messageObject.delta);
           }
         });
 
@@ -177,6 +182,7 @@ const useOpenAiRealTime = ({
     sendBase64AudioStringChunk,
     isInitialized,
     isAiResponseInProgress,
+    transcription,
   };
 };
 
