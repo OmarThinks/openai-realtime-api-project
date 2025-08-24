@@ -1,5 +1,7 @@
 # Openai Realtime API Project:
 
+- YouTube: https://www.youtube.com/watch?v=hPoZjt1Pg7k
+
 <img src="./media/Screenshot.png" />
 
 ### How to use:
