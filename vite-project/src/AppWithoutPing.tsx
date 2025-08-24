@@ -1,6 +1,4 @@
 import "./App.css";
-// Just a dummy base64 24K audio for pinging, it says "Hey, can you hear me?"
-import { dummyBase64Audio24K } from "./samples/dummyBase64Audio";
 import {
   combineBase64ArrayList,
   useOpenAiRealTime,
@@ -64,10 +62,6 @@ function App() {
     onSocketClose,
     onReadyToReceiveAudio,
   });
-
-  const ping = useCallback(() => {
-    sendBase64AudioStringChunk(dummyBase64Audio24K);
-  }, [sendBase64AudioStringChunk]);
 
   const [chunks, setChunks] = useState<string[]>([]);
 
@@ -137,19 +131,6 @@ function App() {
       }}
     >
       <div>
-        <button
-          onClick={() => {
-            playAudio({
-              base64Text: dummyBase64Audio24K,
-              sampleRate: 24000,
-            });
-          }}
-        >
-          Play 24K string
-        </button>
-      </div>
-      <div>
-        {isWebSocketConnected && <button onClick={ping}>Ping</button>}
         {isWebSocketConnecting ? (
           <span>Connecting...</span>
         ) : isWebSocketConnected ? (
