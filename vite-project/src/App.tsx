@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import "./App.css";
 import { dummyBase64Text } from "./samples/dummyBase64Audio";
 
@@ -8,6 +9,33 @@ function App() {
     playPCMBase64({ base64String: dummyBase64Text, sampleRate: 16000 });
   };
   const pingTemplate = () => {};
+
+  const webSocketRef = useRef<null | WebSocket>(null);
+
+  const connectWebSocket = () => {
+    const url =
+      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17";
+    const ws = new WebSocket(url, {
+      headers: {
+        Authorization: "Bearer " + apiKey,
+        "OpenAI-Beta": "realtime=v1",
+      },
+    });
+
+    ws.on("open", function open() {
+      console.log("Connected to server.");
+    });
+
+    ws.on("message", function incoming(message) {
+      console.log(JSON.parse(message.toString()));
+    });
+  };
+
+  useEffect(() => {
+    if (webSocketRef) {
+      webSocketRef?.current?.close();
+    }
+  });
 
   return (
     <div
