@@ -1,16 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Buffer } from "buffer";
 
-const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
+const useOpenAiRealTime = ({
+  instructions,
+  onMessageReceived,
+  onAudioResponseComplete,
+}: {
+  instructions: string;
+  onMessageReceived: (message: object) => void;
+  onAudioResponseComplete: (base64Audio: string) => void;
+}) => {
   const webSocketRef = useRef<null | WebSocket>(null);
   const [isWebSocketConnecting, setIsWebSocketConnecting] = useState(false);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isAiResponseInProgress, setIsAiResponseInProgress] = useState(false);
+
+  const responseQueueRef = useRef<string[]>([]);
 
   const resetHookState = useCallback(() => {
     webSocketRef.current = null;
     setIsWebSocketConnecting(false);
     setIsWebSocketConnected(false);
     setIsInitialized(false);
+    responseQueueRef.current = [];
+    setIsAiResponseInProgress(false);
   }, []);
 
   const connectWebSocket = useCallback(
@@ -46,6 +60,27 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
 
         ws.addEventListener("message", (event) => {
           console.log("WebSocket message:", event.data);
+          // convert message to an object
+
+          const messageObject = JSON.parse(event.data);
+          onMessageReceived(messageObject);
+          if (messageObject.type === "response.created") {
+            setIsAiResponseInProgress(true);
+          }
+          if (messageObject.type === "response.audio.done") {
+            setIsAiResponseInProgress(false);
+            const combinedBase64 = combineBase64ArrayList(
+              responseQueueRef.current
+            );
+            responseQueueRef.current = [];
+            onAudioResponseComplete(combinedBase64);
+          }
+          if (messageObject.type === "response.audio.delta") {
+            const audioChunk = messageObject.delta;
+            if (audioChunk) {
+              responseQueueRef.current.push(audioChunk);
+            }
+          }
         });
 
         webSocketRef.current = ws;
@@ -55,7 +90,7 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
         setIsWebSocketConnecting(false);
       }
     },
-    [resetHookState]
+    [onAudioResponseComplete, onMessageReceived, resetHookState]
   );
 
   const disconnectSocket = useCallback(() => {
@@ -109,7 +144,40 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
     isWebSocketConnecting,
     sendBase64AudioStringChunk,
     isInitialized,
+    isAiResponseInProgress,
   };
+};
+
+const combineBase64ArrayList = (base64Array: string[]): string => {
+  const pcmChunks: Uint8Array[] = base64Array.map((base64Text) => {
+    if (base64Text) {
+      const buf = Buffer.from(base64Text, "base64"); // decode base64 to raw bytes
+      const toReturn = new Uint8Array(
+        buf.buffer,
+        buf.byteOffset,
+        buf.byteLength
+      );
+      return toReturn;
+    } else {
+      return new Uint8Array();
+    }
+  });
+
+  // Calculate total length
+  const totalLength = pcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+
+  // Create one big Uint8Array
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of pcmChunks) {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  // Convert back to base64
+  const combinedBase64 = Buffer.from(combined.buffer).toString("base64");
+
+  return combinedBase64;
 };
 
 export { useOpenAiRealTime };

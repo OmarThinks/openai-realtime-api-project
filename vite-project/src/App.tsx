@@ -4,16 +4,34 @@ import {
   dummyBase64Audio24K,
 } from "./samples/dummyBase64Audio";
 import { useOpenAiRealTime } from "./hooks/useOpenAiRealTimeHook";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 function App() {
+  const [messages, setMessages] = useState<object[]>([]);
+
+  const enqueueMessage = useCallback((message: object) => {
+    setMessages((prevMessages) => [...prevMessages, message]);
+  }, []);
+
+  const onAudioResponseComplete = useCallback((base64String: string) => {
+    console.log("Audio response complete:", base64String);
+    playPCMBase64({
+      base64String,
+      sampleRate: 24000,
+    });
+  }, []);
+
   const {
     isWebSocketConnected,
     connectWebSocket,
     disconnectSocket,
     isWebSocketConnecting,
     sendBase64AudioStringChunk,
-  } = useOpenAiRealTime({ instructions: "You are a helpful assistant." });
+  } = useOpenAiRealTime({
+    instructions: "You are a helpful assistant.",
+    onMessageReceived: enqueueMessage,
+    onAudioResponseComplete,
+  });
 
   const _connectWebSocket = useCallback(async () => {
     const tokenResponse = await fetch("http://localhost:3000/session");
@@ -23,7 +41,7 @@ function App() {
   }, [connectWebSocket]);
 
   const ping = useCallback(() => {
-    sendBase64AudioStringChunk(dummyBase64Audio24K);
+    sendBase64AudioStringChunk(dummyBase64Audio16k);
   }, [sendBase64AudioStringChunk]);
 
   /*
@@ -82,7 +100,14 @@ function App() {
   return (
     <div
       className=""
-      style={{ width: "100vw", backgroundColor: "black", minHeight: "100vh" }}
+      style={{
+        width: "100vw",
+        backgroundColor: "black",
+        minHeight: "100vh",
+        gap: 16,
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
       <div>
         <button
@@ -116,6 +141,13 @@ function App() {
           <button onClick={_connectWebSocket}>connectWebSocket</button>
         )}
       </div>
+      <button
+        onClick={() => {
+          console.log("Log Messages:", messages);
+        }}
+      >
+        Log Messages
+      </button>
     </div>
   );
 }

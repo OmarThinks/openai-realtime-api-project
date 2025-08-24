@@ -1,0 +1,5 @@
+- create a function called `onMessageReceived`, and make it triggered on every message received
+- try to convert message to object
+- create a state called `messages`, which is a messages list
+- `onMessageReceived` => push to messages
+- create a button called `log messages`, make it log messages
