@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import "./App.css";
 import { dummyBase64Text } from "./samples/dummyBase64Audio";
-
-const apiKey = import.meta.env.VITE_OPENAI_KEY;
+import { useCallback } from "react";
 
 function App() {
   const playPingAudio = () => {
@@ -62,30 +61,53 @@ function App() {
     await pc.setRemoteDescription(answer);
   }
 
-  const connectWebSocket = () => {
-    const url =
-      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17";
+  const connectWebSocket = useCallback(async () => {
+    const tokenResponse = await fetch("http://localhost:3000/session");
+    const data = await tokenResponse.json();
+    const EPHEMERAL_KEY = data.client_secret.value;
+
+    const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&token=${EPHEMERAL_KEY}`;
+    /*
     const ws = new WebSocket(url, {
       headers: {
-        Authorization: "Bearer " + apiKey,
+        Authorization: "Bearer " + EPHEMERAL_KEY,
         "OpenAI-Beta": "realtime=v1",
       },
-    });
+    });*/
 
-    ws.on("open", function open() {
+    const ws = new WebSocket(
+      `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&token=${EPHEMERAL_KEY}`,
+      [
+        "realtime",
+        // Beta protocol, required
+        "openai-beta.realtime-v1",
+      ]
+    );
+
+    ws.addEventListener("open", () => {
       console.log("Connected to server.");
     });
 
-    ws.on("message", function incoming(message) {
-      console.log(JSON.parse(message.toString()));
+    ws.addEventListener("close", () => {
+      console.log("Disconnected from server.");
     });
-  };
+
+    ws.addEventListener("error", (error) => {
+      console.error("WebSocket error:", error);
+    });
+
+    ws.addEventListener("message", (event) => {
+      console.log("WebSocket message:", event.data);
+    });
+
+    webSocketRef.current = ws;
+  }, []);
 
   useEffect(() => {
-    if (webSocketRef) {
-      webSocketRef?.current?.close();
+    if (webSocketRef.current) {
+      webSocketRef.current.close();
     }
-  });
+  }, []);
 
   return (
     <div
@@ -94,7 +116,7 @@ function App() {
     >
       <button onClick={pingTemplate}>Ping Template</button>
       <button onClick={playPingAudio}>playPingAudio</button>
-      <button onClick={init}>init</button>
+      <button onClick={connectWebSocket}>connectWebSocket</button>
     </div>
   );
 }
