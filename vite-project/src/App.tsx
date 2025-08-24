@@ -68,6 +68,14 @@ function App() {
 
   const [chunks, setChunks] = useState<string[]>([]);
 
+  console.log(
+    "before onAudioStreamerChunk: ",
+    isWebSocketConnected,
+    isInitialized,
+    isAiResponseInProgress,
+    isAudioPlayingRef.current
+  );
+
   const onAudioStreamerChunk = useCallback(
     (chunk: string) => {
       setChunks((prev) => [...prev, chunk]);
@@ -117,12 +125,13 @@ function App() {
 
   useEffect(() => {
     if (isWebSocketConnected) {
-      startStreaming();
+      if (isInitialized) {
+        startStreaming();
+      }
     } else {
       stopStreaming();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isWebSocketConnected]);
+  }, [isWebSocketConnected, startStreaming, stopStreaming, isInitialized]);
 
   return (
     <div
