@@ -1,11 +1,14 @@
 import "./App.css";
-import { dummyBase64Text } from "./samples/dummyBase64Audio";
+import {
+  dummyBase64Audio16k,
+  dummyBase64Audio24K,
+} from "./samples/dummyBase64Audio";
 import { useOpenAiRealTime } from "./hooks/useOpenAiRealTimeHook";
 import { useCallback } from "react";
 
 function App() {
   const playPingAudio = () => {
-    playPCMBase64({ base64String: dummyBase64Text, sampleRate: 16000 });
+    playPCMBase64({ base64String: dummyBase64Audio16k, sampleRate: 16000 });
   };
   const pingTemplate = () => {};
 
@@ -81,6 +84,26 @@ function App() {
       className=""
       style={{ width: "100vw", backgroundColor: "black", minHeight: "100vh" }}
     >
+      <button
+        onClick={() =>
+          playPCMBase64({
+            base64String: dummyBase64Audio16k,
+            sampleRate: 16000,
+          })
+        }
+      >
+        Play 16K string
+      </button>
+      <button
+        onClick={() =>
+          playPCMBase64({
+            base64String: dummyBase64Audio24K,
+            sampleRate: 24000,
+          })
+        }
+      >
+        Play 24k string
+      </button>
       <button onClick={pingTemplate}>Ping Template</button>
       <button onClick={playPingAudio}>playPingAudio</button>
       {isWebSocketConnecting ? (

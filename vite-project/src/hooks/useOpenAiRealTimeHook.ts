@@ -4,10 +4,21 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
   const webSocketRef = useRef<null | WebSocket>(null);
   const [isWebSocketConnecting, setIsWebSocketConnecting] = useState(false);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  const resetHookState = useCallback(() => {
+    webSocketRef.current = null;
+    setIsWebSocketConnecting(false);
+    setIsWebSocketConnected(false);
+    setIsInitialized(false);
+  }, []);
 
   const connectWebSocket = useCallback(
     async ({ ephemeralKey }: { ephemeralKey: string }) => {
       setIsWebSocketConnecting(true);
+      if (webSocketRef.current) {
+        return;
+      }
 
       try {
         const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&token=${ephemeralKey}`;
@@ -26,6 +37,7 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
         ws.addEventListener("close", () => {
           console.log("Disconnected from server.");
           setIsWebSocketConnected(false);
+          resetHookState();
         });
 
         ws.addEventListener("error", (error) => {
@@ -43,7 +55,7 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
         setIsWebSocketConnecting(false);
       }
     },
-    []
+    [resetHookState]
   );
 
   const disconnectSocket = useCallback(() => {
@@ -68,14 +80,35 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
         },
       };
       webSocketRef.current?.send(JSON.stringify(event));
+      setIsInitialized(true);
     }
   }, [instructions, isWebSocketConnected]);
+
+  const sendMessage = useCallback((messageObject: { [key: string]: any }) => {
+    if (webSocketRef.current) {
+      webSocketRef.current.send(JSON.stringify(messageObject));
+    }
+  }, []);
+
+  const sendBase64AudioStringChunk = useCallback(
+    (base64String: string) => {
+      if (webSocketRef.current) {
+        sendMessage({
+          type: "input_audio_buffer.append",
+          audio: base64String,
+        });
+      }
+    },
+    [sendMessage]
+  );
 
   return {
     isWebSocketConnected,
     connectWebSocket,
     disconnectSocket,
     isWebSocketConnecting,
+    sendBase64AudioStringChunk,
+    isInitialized,
   };
 };
 
