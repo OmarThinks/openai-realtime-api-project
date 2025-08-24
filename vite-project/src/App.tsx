@@ -1,6 +1,7 @@
 import "./App.css";
 import { dummyBase64Text } from "./samples/dummyBase64Audio";
 import { useOpenAiRealTime } from "./hooks/useOpenAiRealTimeHook";
+import { useCallback } from "react";
 
 function App() {
   const playPingAudio = () => {
@@ -9,7 +10,14 @@ function App() {
   const pingTemplate = () => {};
 
   const { isWebSocketConnected, connectWebSocket, disconnectSocket } =
-    useOpenAiRealTime();
+    useOpenAiRealTime({ instructions: "You are a helpful assistant." });
+
+  const _connectWebSocket = useCallback(async () => {
+    const tokenResponse = await fetch("http://localhost:3000/session");
+    const data = await tokenResponse.json();
+    const EPHEMERAL_KEY = data.client_secret.value;
+    connectWebSocket({ ephemeralKey: EPHEMERAL_KEY });
+  }, [connectWebSocket]);
 
   /*
   const connectWebSocket = useCallback(async () => {
@@ -72,7 +80,7 @@ function App() {
       <button onClick={pingTemplate}>Ping Template</button>
       <button onClick={playPingAudio}>playPingAudio</button>
       {!isWebSocketConnected && (
-        <button onClick={connectWebSocket}>connectWebSocket</button>
+        <button onClick={_connectWebSocket}>connectWebSocket</button>
       )}
       {isWebSocketConnected && (
         <button onClick={disconnectSocket}>disconnectSocket</button>
