@@ -9,8 +9,12 @@ function App() {
   };
   const pingTemplate = () => {};
 
-  const { isWebSocketConnected, connectWebSocket, disconnectSocket } =
-    useOpenAiRealTime({ instructions: "You are a helpful assistant." });
+  const {
+    isWebSocketConnected,
+    connectWebSocket,
+    disconnectSocket,
+    isWebSocketConnecting,
+  } = useOpenAiRealTime({ instructions: "You are a helpful assistant." });
 
   const _connectWebSocket = useCallback(async () => {
     const tokenResponse = await fetch("http://localhost:3000/session");
@@ -79,11 +83,12 @@ function App() {
     >
       <button onClick={pingTemplate}>Ping Template</button>
       <button onClick={playPingAudio}>playPingAudio</button>
-      {!isWebSocketConnected && (
-        <button onClick={_connectWebSocket}>connectWebSocket</button>
-      )}
-      {isWebSocketConnected && (
+      {isWebSocketConnecting ? (
+        <span>Connecting...</span>
+      ) : isWebSocketConnected ? (
         <button onClick={disconnectSocket}>disconnectSocket</button>
+      ) : (
+        <button onClick={_connectWebSocket}>connectWebSocket</button>
       )}
     </div>
   );

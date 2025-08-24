@@ -2,37 +2,46 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
   const webSocketRef = useRef<null | WebSocket>(null);
+  const [isWebSocketConnecting, setIsWebSocketConnecting] = useState(false);
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
 
   const connectWebSocket = useCallback(
     async ({ ephemeralKey }: { ephemeralKey: string }) => {
-      const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&token=${ephemeralKey}`;
+      setIsWebSocketConnecting(true);
 
-      const ws = new WebSocket(url, [
-        "realtime",
-        "openai-insecure-api-key." + ephemeralKey,
-        "openai-beta.realtime-v1",
-      ]);
+      try {
+        const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&token=${ephemeralKey}`;
 
-      ws.addEventListener("open", () => {
-        console.log("Connected to server.");
-        setIsWebSocketConnected(true);
-      });
+        const ws = new WebSocket(url, [
+          "realtime",
+          "openai-insecure-api-key." + ephemeralKey,
+          "openai-beta.realtime-v1",
+        ]);
 
-      ws.addEventListener("close", () => {
-        console.log("Disconnected from server.");
-        setIsWebSocketConnected(false);
-      });
+        ws.addEventListener("open", () => {
+          console.log("Connected to server.");
+          setIsWebSocketConnected(true);
+        });
 
-      ws.addEventListener("error", (error) => {
-        console.error("WebSocket error:", error);
-      });
+        ws.addEventListener("close", () => {
+          console.log("Disconnected from server.");
+          setIsWebSocketConnected(false);
+        });
 
-      ws.addEventListener("message", (event) => {
-        console.log("WebSocket message:", event.data);
-      });
+        ws.addEventListener("error", (error) => {
+          console.error("WebSocket error:", error);
+        });
 
-      webSocketRef.current = ws;
+        ws.addEventListener("message", (event) => {
+          console.log("WebSocket message:", event.data);
+        });
+
+        webSocketRef.current = ws;
+      } catch (error) {
+        console.error("Error connecting to WebSocket:", error);
+      } finally {
+        setIsWebSocketConnecting(false);
+      }
     },
     []
   );
@@ -66,6 +75,7 @@ const useOpenAiRealTime = ({ instructions }: { instructions: string }) => {
     isWebSocketConnected,
     connectWebSocket,
     disconnectSocket,
+    isWebSocketConnecting,
   };
 };
 
