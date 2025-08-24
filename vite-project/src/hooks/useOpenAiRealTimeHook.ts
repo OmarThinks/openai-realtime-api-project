@@ -65,7 +65,7 @@ const useOpenAiRealTime = ({
 
         ws.addEventListener("error", (error) => {
           console.error("WebSocket error:", error);
-          onSocketError(error);
+          onSocketError?.(error);
         });
 
         ws.addEventListener("message", (event) => {

@@ -4,7 +4,7 @@ import {
   combineBase64ArrayList,
   useOpenAiRealTime,
 } from "./hooks/useOpenAiRealTimeHook";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function App() {
   const [messages, setMessages] = useState<object[]>([]);
@@ -37,13 +37,12 @@ function App() {
   }, []);
 
   const onSocketClose = useCallback(() => {
-    stopStreaming();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    console.log("onSocketClose");
+    //stopStreaming();
   }, []);
 
   const onReadyToReceiveAudio = useCallback(() => {
-    startStreaming();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    //startStreaming();
   }, []);
 
   const {
@@ -72,6 +71,14 @@ function App() {
   const onAudioStreamerChunk = useCallback(
     (chunk: string) => {
       setChunks((prev) => [...prev, chunk]);
+      console.log(
+        "Got audio chunk:",
+        chunk.slice(0, 50) + "...",
+        isWebSocketConnected,
+        isInitialized,
+        isAiResponseInProgress,
+        isAudioPlayingRef.current
+      );
       if (
         isWebSocketConnected &&
         isInitialized &&
@@ -107,6 +114,15 @@ function App() {
     const EPHEMERAL_KEY = data.client_secret.value;
     connectWebSocket({ ephemeralKey: EPHEMERAL_KEY });
   }, [connectWebSocket]);
+
+  useEffect(() => {
+    if (isWebSocketConnected) {
+      startStreaming();
+    } else {
+      stopStreaming();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWebSocketConnected]);
 
   return (
     <div
@@ -216,7 +232,7 @@ const useAudioStreamer = ({
   const bufferRef = useRef<Float32Array[]>([]);
   const intervalIdRef = useRef<number | null>(null);
 
-  const startStreaming = async () => {
+  const startStreaming = useCallback(async () => {
     if (isStreaming) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -266,9 +282,9 @@ const useAudioStreamer = ({
     } catch (err) {
       console.error("Error starting audio stream:", err);
     }
-  };
+  }, [interval, isStreaming, onAudioChunk, sampleRate, updateIsStreaming]);
 
-  const stopStreaming = () => {
+  const stopStreaming = useCallback(() => {
     if (!isStreaming) return;
 
     if (intervalIdRef.current) {
@@ -290,7 +306,7 @@ const useAudioStreamer = ({
     bufferRef.current = [];
 
     updateIsStreaming(false);
-  };
+  }, [isStreaming, updateIsStreaming]);
 
   return { isStreaming, startStreaming, stopStreaming };
 };
@@ -343,39 +359,7 @@ const useAudioPlayer = ({
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  const playAudio = ({
-    sampleRate,
-    base64Text,
-  }: {
-    sampleRate: number;
-    base64Text: string;
-  }) => {
-    stopPlayingAudio(); // stop any currently playing audio first
-
-    const float32 = base64ToFloat32Array(base64Text);
-
-    const audioContext = new AudioContext({ sampleRate });
-    audioContextRef.current = audioContext;
-
-    const buffer = audioContext.createBuffer(1, float32.length, sampleRate);
-    buffer.copyToChannel(float32, 0);
-
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContext.destination);
-
-    source.onended = () => {
-      updateIsAudioPlaying(false);
-      stopPlayingAudio();
-    };
-
-    source.start();
-    sourceRef.current = source;
-
-    updateIsAudioPlaying(true);
-  };
-
-  const stopPlayingAudio = () => {
+  const stopPlayingAudio = useCallback(() => {
     if (sourceRef.current) {
       try {
         sourceRef.current.stop();
@@ -390,7 +374,42 @@ const useAudioPlayer = ({
       audioContextRef.current = null;
     }
     updateIsAudioPlaying(false);
-  };
+  }, [updateIsAudioPlaying]);
+
+  const playAudio = useCallback(
+    ({
+      sampleRate,
+      base64Text,
+    }: {
+      sampleRate: number;
+      base64Text: string;
+    }) => {
+      stopPlayingAudio(); // stop any currently playing audio first
+
+      const float32 = base64ToFloat32Array(base64Text);
+
+      const audioContext = new AudioContext({ sampleRate });
+      audioContextRef.current = audioContext;
+
+      const buffer = audioContext.createBuffer(1, float32.length, sampleRate);
+      buffer.copyToChannel(float32, 0);
+
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+
+      source.onended = () => {
+        updateIsAudioPlaying(false);
+        stopPlayingAudio();
+      };
+
+      source.start();
+      sourceRef.current = source;
+
+      updateIsAudioPlaying(true);
+    },
+    [stopPlayingAudio, updateIsAudioPlaying]
+  );
 
   return { isAudioPlaying, playAudio, stopPlayingAudio };
 };
