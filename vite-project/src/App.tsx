@@ -7,16 +7,12 @@ import { useOpenAiRealTime } from "./hooks/useOpenAiRealTimeHook";
 import { useCallback } from "react";
 
 function App() {
-  const playPingAudio = () => {
-    playPCMBase64({ base64String: dummyBase64Audio16k, sampleRate: 16000 });
-  };
-  const pingTemplate = () => {};
-
   const {
     isWebSocketConnected,
     connectWebSocket,
     disconnectSocket,
     isWebSocketConnecting,
+    sendBase64AudioStringChunk,
   } = useOpenAiRealTime({ instructions: "You are a helpful assistant." });
 
   const _connectWebSocket = useCallback(async () => {
@@ -25,6 +21,10 @@ function App() {
     const EPHEMERAL_KEY = data.client_secret.value;
     connectWebSocket({ ephemeralKey: EPHEMERAL_KEY });
   }, [connectWebSocket]);
+
+  const ping = useCallback(() => {
+    sendBase64AudioStringChunk(dummyBase64Audio24K);
+  }, [sendBase64AudioStringChunk]);
 
   /*
   const connectWebSocket = useCallback(async () => {
@@ -84,35 +84,38 @@ function App() {
       className=""
       style={{ width: "100vw", backgroundColor: "black", minHeight: "100vh" }}
     >
-      <button
-        onClick={() =>
-          playPCMBase64({
-            base64String: dummyBase64Audio16k,
-            sampleRate: 16000,
-          })
-        }
-      >
-        Play 16K string
-      </button>
-      <button
-        onClick={() =>
-          playPCMBase64({
-            base64String: dummyBase64Audio24K,
-            sampleRate: 24000,
-          })
-        }
-      >
-        Play 24k string
-      </button>
-      <button onClick={pingTemplate}>Ping Template</button>
-      <button onClick={playPingAudio}>playPingAudio</button>
-      {isWebSocketConnecting ? (
-        <span>Connecting...</span>
-      ) : isWebSocketConnected ? (
-        <button onClick={disconnectSocket}>disconnectSocket</button>
-      ) : (
-        <button onClick={_connectWebSocket}>connectWebSocket</button>
-      )}
+      <div>
+        <button
+          onClick={() =>
+            playPCMBase64({
+              base64String: dummyBase64Audio16k,
+              sampleRate: 16000,
+            })
+          }
+        >
+          Play 16K string
+        </button>
+        <button
+          onClick={() =>
+            playPCMBase64({
+              base64String: dummyBase64Audio24K,
+              sampleRate: 24000,
+            })
+          }
+        >
+          Play 24k string
+        </button>
+      </div>
+      <div>
+        {isWebSocketConnected && <button onClick={ping}>Ping</button>}
+        {isWebSocketConnecting ? (
+          <span>Connecting...</span>
+        ) : isWebSocketConnected ? (
+          <button onClick={disconnectSocket}>disconnectSocket</button>
+        ) : (
+          <button onClick={_connectWebSocket}>connectWebSocket</button>
+        )}
+      </div>
     </div>
   );
 }
