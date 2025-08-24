@@ -158,12 +158,27 @@ const useAudioStreamer = ({
   sampleRate,
   interval,
   onAudioChunk,
+  onStartStreaming,
+  onStopStreaming,
 }: {
   sampleRate: number;
   interval: number;
   onAudioChunk: (audioChunk: string) => void;
+  onStartStreaming: () => void;
+  onStopStreaming: () => void;
 }) => {
   const [isStreaming, setIsStreaming] = useState(false);
+  const updateIsStreaming = useCallback(
+    (streaming: boolean) => {
+      setIsStreaming(streaming);
+      if (streaming) {
+        onStartStreaming();
+      } else {
+        onStopStreaming();
+      }
+    },
+    [onStartStreaming, onStopStreaming]
+  );
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -216,7 +231,7 @@ const useAudioStreamer = ({
         onAudioChunk(base64);
       }, interval);
 
-      setIsStreaming(true);
+      updateIsStreaming(true);
     } catch (err) {
       console.error("Error starting audio stream:", err);
     }
@@ -243,7 +258,7 @@ const useAudioStreamer = ({
     }
     bufferRef.current = [];
 
-    setIsStreaming(false);
+    updateIsStreaming(false);
   };
 
   return { isStreaming, startStreaming, stopStreaming };
@@ -270,7 +285,13 @@ function base64ToFloat32Array(base64String: string): Float32Array {
   return float32;
 }
 
-const useAudioPlayer = (): {
+const useAudioPlayer = ({
+  onStartAudioPlaying,
+  onStopAudioPlaying,
+}: {
+  onStartAudioPlaying: () => void;
+  onStopAudioPlaying: () => void;
+}): {
   isAudioPlaying: boolean;
   playAudio: ({
     sampleRate,
@@ -282,6 +303,18 @@ const useAudioPlayer = (): {
   stopPlayingAudio: () => void;
 } => {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const updateIsAudioPlaying = useCallback(
+    (playing: boolean) => {
+      setIsAudioPlaying(playing);
+      if (playing) {
+        onStartAudioPlaying();
+      } else {
+        onStopAudioPlaying();
+      }
+    },
+    [onStartAudioPlaying, onStopAudioPlaying]
+  );
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
 
@@ -307,14 +340,14 @@ const useAudioPlayer = (): {
     source.connect(audioContext.destination);
 
     source.onended = () => {
-      setIsAudioPlaying(false);
+      updateIsAudioPlaying(false);
       stopPlayingAudio();
     };
 
     source.start();
     sourceRef.current = source;
 
-    setIsAudioPlaying(true);
+    updateIsAudioPlaying(true);
   };
 
   const stopPlayingAudio = () => {
@@ -331,7 +364,7 @@ const useAudioPlayer = (): {
       audioContextRef.current.close();
       audioContextRef.current = null;
     }
-    setIsAudioPlaying(false);
+    updateIsAudioPlaying(false);
   };
 
   return { isAudioPlaying, playAudio, stopPlayingAudio };
