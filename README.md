@@ -1,5 +1,7 @@
 # Openai Realtime API Project:
 
+<img src="./media/Screenshot.png" />
+
 ### How to use:
 
 ```bash
