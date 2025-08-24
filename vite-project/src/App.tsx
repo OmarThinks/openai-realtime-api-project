@@ -19,11 +19,13 @@ function App() {
   });
 
   const enqueueMessage = useCallback((message: object) => {
+    console.log("Got response chunk");
     setMessages((prevMessages) => [...prevMessages, message]);
   }, []);
 
   const onAudioResponseComplete = useCallback(
     (base64String: string) => {
+      console.log("Playing full response");
       playAudio({
         sampleRate: 24000,
         base64Text: base64String,
@@ -68,25 +70,11 @@ function App() {
 
   const [chunks, setChunks] = useState<string[]>([]);
 
-  console.log(
-    "before onAudioStreamerChunk: ",
-    isWebSocketConnected,
-    isInitialized,
-    isAiResponseInProgress,
-    isAudioPlayingRef.current
-  );
+  console.log("before onAudioStreamerChunk: ", isAiResponseInProgress);
 
   const onAudioStreamerChunk = useCallback(
     (chunk: string) => {
       setChunks((prev) => [...prev, chunk]);
-      console.log(
-        "Got audio chunk:",
-        chunk.slice(0, 50) + "...",
-        isWebSocketConnected,
-        isInitialized,
-        isAiResponseInProgress,
-        isAudioPlayingRef.current
-      );
       if (
         isWebSocketConnected &&
         isInitialized &&
@@ -106,7 +94,7 @@ function App() {
   );
 
   const { isStreaming, startStreaming, stopStreaming } = useAudioStreamer({
-    sampleRate: 16000, // e.g., 16kHz
+    sampleRate: 24000, // e.g., 16kHz
     interval: 250, // emit every 250 milliseconds
     onAudioChunk: onAudioStreamerChunk,
   });
@@ -126,9 +114,11 @@ function App() {
   useEffect(() => {
     if (isWebSocketConnected) {
       if (isInitialized) {
+        console.log("Starting audio streaming");
         startStreaming();
       }
     } else {
+      console.log("Stopping audio streaming");
       stopStreaming();
     }
   }, [isWebSocketConnected, startStreaming, stopStreaming, isInitialized]);

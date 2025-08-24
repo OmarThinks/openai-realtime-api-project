@@ -143,11 +143,19 @@ const useOpenAiRealTime = ({
     }
   }, [instructions, isWebSocketConnected]);
 
-  const sendMessage = useCallback((messageObject: { [key: string]: any }) => {
-    if (webSocketRef.current) {
-      webSocketRef.current.send(JSON.stringify(messageObject));
-    }
-  }, []);
+  const sendMessage = useCallback(
+    (messageObject: { [key: string]: any }) => {
+      if (
+        webSocketRef.current &&
+        webSocketRef.current.readyState === WebSocket.OPEN &&
+        isWebSocketConnected &&
+        isInitialized
+      ) {
+        webSocketRef.current.send(JSON.stringify(messageObject));
+      }
+    },
+    [isInitialized, isWebSocketConnected]
+  );
 
   const sendBase64AudioStringChunk = useCallback(
     (base64String: string) => {
