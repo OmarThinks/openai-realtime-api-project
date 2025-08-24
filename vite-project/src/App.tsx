@@ -1,5 +1,7 @@
 import "./App.css";
 
+const apiKey = import.meta.env.VITE_OPENAI_KEY;
+
 function App() {
   return (
     <div
