@@ -185,4 +185,4 @@ const combineBase64ArrayList = (base64Array: string[]): string => {
   return combinedBase64;
 };
 
-export { useOpenAiRealTime };
+export { useOpenAiRealTime, combineBase64ArrayList };
