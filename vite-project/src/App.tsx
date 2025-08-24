@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { dummyBase64Text } from "./samples/dummyBase64Audio";
-import { useCallback } from "react";
+import { useOpenAiRealTime } from "./hooks/useOpenAiRealTimeHook";
 
 function App() {
   const playPingAudio = () => {
@@ -9,23 +8,16 @@ function App() {
   };
   const pingTemplate = () => {};
 
-  const webSocketRef = useRef<null | WebSocket>(null);
+  const { isWebSocketConnected, connectWebSocket, disconnectSocket } =
+    useOpenAiRealTime();
 
-  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
-
+  /*
   const connectWebSocket = useCallback(async () => {
     const tokenResponse = await fetch("http://localhost:3000/session");
     const data = await tokenResponse.json();
     const EPHEMERAL_KEY = data.client_secret.value;
 
     const url = `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17&token=${EPHEMERAL_KEY}`;
-    /*
-    const ws = new WebSocket(url, {
-      headers: {
-        Authorization: "Bearer " + EPHEMERAL_KEY,
-        "OpenAI-Beta": "realtime=v1",
-      },
-    });*/
 
     const ws = new WebSocket(
       `wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`,
@@ -56,8 +48,9 @@ function App() {
     });
 
     webSocketRef.current = ws;
-  }, []);
+  }, []);*/
 
+  /*
   const disconnectSocket = useCallback(() => {
     if (webSocketRef.current) {
       webSocketRef.current.close();
@@ -70,7 +63,7 @@ function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
+*/
   return (
     <div
       className=""
