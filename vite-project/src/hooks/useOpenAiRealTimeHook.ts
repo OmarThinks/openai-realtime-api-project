@@ -5,10 +5,12 @@ const useOpenAiRealTime = ({
   instructions,
   onMessageReceived,
   onAudioResponseComplete,
+  onUsageReport,
 }: {
   instructions: string;
   onMessageReceived: (message: object) => void;
   onAudioResponseComplete: (base64Audio: string) => void;
+  onUsageReport: (usage: object) => void;
 }) => {
   const webSocketRef = useRef<null | WebSocket>(null);
   const [isWebSocketConnecting, setIsWebSocketConnecting] = useState(false);
@@ -59,7 +61,7 @@ const useOpenAiRealTime = ({
         });
 
         ws.addEventListener("message", (event) => {
-          console.log("WebSocket message:", event.data);
+          //console.log("WebSocket message:", event.data);
           // convert message to an object
 
           const messageObject = JSON.parse(event.data);
@@ -81,6 +83,9 @@ const useOpenAiRealTime = ({
               responseQueueRef.current.push(audioChunk);
             }
           }
+          if (messageObject?.response?.usage) {
+            onUsageReport(messageObject.response.usage);
+          }
         });
 
         webSocketRef.current = ws;
@@ -90,7 +95,7 @@ const useOpenAiRealTime = ({
         setIsWebSocketConnecting(false);
       }
     },
-    [onAudioResponseComplete, onMessageReceived, resetHookState]
+    [onAudioResponseComplete, onMessageReceived, onUsageReport, resetHookState]
   );
 
   const disconnectSocket = useCallback(() => {
