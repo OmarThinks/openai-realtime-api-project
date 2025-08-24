@@ -9,16 +9,21 @@ import { useCallback, useRef, useState } from "react";
 function App() {
   const [messages, setMessages] = useState<object[]>([]);
 
+  const { isAudioPlaying, playAudio, stopPlayingAudio } = useAudioPlayer();
+
   const enqueueMessage = useCallback((message: object) => {
     setMessages((prevMessages) => [...prevMessages, message]);
   }, []);
 
-  const onAudioResponseComplete = useCallback((base64String: string) => {
-    playPCMBase64({
-      base64String,
-      sampleRate: 24000,
-    });
-  }, []);
+  const onAudioResponseComplete = useCallback(
+    (base64String: string) => {
+      playAudio({
+        sampleRate: 24000,
+        base64Text: base64String,
+      });
+    },
+    [playAudio]
+  );
 
   const onUsageReport = useCallback((usage: object) => {
     console.log("Usage report:", usage);
@@ -61,7 +66,7 @@ function App() {
 
   const playAudioChunks = () => {
     const combined = combineBase64ArrayList(chunks);
-    playPCMBase64({ base64String: combined, sampleRate: 16000 });
+    playAudio({ base64Text: combined, sampleRate: 16000 });
   };
 
   return (
@@ -78,12 +83,12 @@ function App() {
     >
       <div>
         <button
-          onClick={() =>
-            playPCMBase64({
-              base64String: dummyBase64Audio16k,
+          onClick={() => {
+            playAudio({
+              base64Text: dummyBase64Audio16k,
               sampleRate: 16000,
-            })
-          }
+            });
+          }}
         >
           Play 16K string
         </button>
@@ -97,14 +102,25 @@ function App() {
         ) : (
           <button onClick={_connectWebSocket}>connectWebSocket</button>
         )}
+
+        <button
+          onClick={() => {
+            console.log("Log Messages:", messages);
+          }}
+        >
+          Log Messages
+        </button>
       </div>
-      <button
-        onClick={() => {
-          console.log("Log Messages:", messages);
-        }}
-      >
-        Log Messages
-      </button>
+
+      <hr />
+
+      <div className=" flex-row flex items-center">
+        <p>Is audio Playing: {isAudioPlaying ? "Yes" : "No"}</p>
+
+        {isAudioPlaying && (
+          <button onClick={stopPlayingAudio}>Stop Playing</button>
+        )}
+      </div>
 
       <hr />
 
@@ -116,41 +132,6 @@ function App() {
       </div>
     </div>
   );
-}
-
-function playPCMBase64({
-  base64String,
-  sampleRate,
-}: {
-  base64String: string;
-  sampleRate: number;
-}) {
-  // Convert base64 to ArrayBuffer
-  const binaryString = atob(base64String);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-
-  // Convert to Int16Array
-  const pcm16 = new Int16Array(bytes.buffer);
-
-  // Convert to Float32Array (range -1.0 to 1.0)
-  const float32 = new Float32Array(pcm16.length);
-  for (let i = 0; i < pcm16.length; i++) {
-    float32[i] = pcm16[i] / 32768; // normalize
-  }
-
-  // Use Web Audio API to play
-  const context = new AudioContext({ sampleRate });
-  const buffer = context.createBuffer(1, float32.length, sampleRate);
-  buffer.copyToChannel(float32, 0);
-
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  source.connect(context.destination);
-  source.start();
 }
 
 function floatTo16BitPCM(float32Array: Float32Array): Int16Array {
@@ -266,6 +247,94 @@ const useAudioStreamer = ({
   };
 
   return { isStreaming, startStreaming, stopStreaming };
+};
+
+function base64ToFloat32Array(base64String: string): Float32Array {
+  // Decode base64 → Uint8Array
+  const binaryString = atob(base64String);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  // Convert Uint8Array → Int16Array
+  const pcm16 = new Int16Array(bytes.buffer);
+
+  // Convert Int16 → Float32 (-1 to 1)
+  const float32 = new Float32Array(pcm16.length);
+  for (let i = 0; i < pcm16.length; i++) {
+    float32[i] = pcm16[i] / 32768;
+  }
+
+  return float32;
+}
+
+const useAudioPlayer = (): {
+  isAudioPlaying: boolean;
+  playAudio: ({
+    sampleRate,
+    base64Text,
+  }: {
+    sampleRate: number;
+    base64Text: string;
+  }) => void;
+  stopPlayingAudio: () => void;
+} => {
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  const playAudio = ({
+    sampleRate,
+    base64Text,
+  }: {
+    sampleRate: number;
+    base64Text: string;
+  }) => {
+    stopPlayingAudio(); // stop any currently playing audio first
+
+    const float32 = base64ToFloat32Array(base64Text);
+
+    const audioContext = new AudioContext({ sampleRate });
+    audioContextRef.current = audioContext;
+
+    const buffer = audioContext.createBuffer(1, float32.length, sampleRate);
+    buffer.copyToChannel(float32, 0);
+
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+
+    source.onended = () => {
+      setIsAudioPlaying(false);
+      stopPlayingAudio();
+    };
+
+    source.start();
+    sourceRef.current = source;
+
+    setIsAudioPlaying(true);
+  };
+
+  const stopPlayingAudio = () => {
+    if (sourceRef.current) {
+      try {
+        sourceRef.current.stop();
+      } catch {
+        //
+      }
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setIsAudioPlaying(false);
+  };
+
+  return { isAudioPlaying, playAudio, stopPlayingAudio };
 };
 
 export default App;
