@@ -1,7 +1,10 @@
 require("dotenv").config();
+const cors = require("cors");
 const express = require("express");
 const app = express();
 const port = 3000; // You can choose any available port
+
+app.use(cors());
 
 // Define a basic route
 app.get("/", (req, res) => {
