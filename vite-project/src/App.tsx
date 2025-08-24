@@ -8,8 +8,15 @@ import { useCallback, useRef, useState } from "react";
 
 function App() {
   const [messages, setMessages] = useState<object[]>([]);
+  const isAudioPlayingRef = useRef(false);
 
-  const { isAudioPlaying, playAudio, stopPlayingAudio } = useAudioPlayer();
+  const onIsAudioPlayingUpdate = useCallback((playing: boolean) => {
+    isAudioPlayingRef.current = playing;
+  }, []);
+
+  const { isAudioPlaying, playAudio, stopPlayingAudio } = useAudioPlayer({
+    onIsAudioPlayingUpdate,
+  });
 
   const enqueueMessage = useCallback((message: object) => {
     setMessages((prevMessages) => [...prevMessages, message]);
@@ -29,25 +36,32 @@ function App() {
     console.log("Usage report:", usage);
   }, []);
 
+  const onSocketClose = useCallback(() => {
+    stopStreaming();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onReadyToReceiveAudio = useCallback(() => {
+    startStreaming();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const {
     isWebSocketConnected,
     connectWebSocket,
     disconnectSocket,
     isWebSocketConnecting,
     sendBase64AudioStringChunk,
+    isAiResponseInProgress,
+    isInitialized,
   } = useOpenAiRealTime({
     instructions: "You are a helpful assistant.",
     onMessageReceived: enqueueMessage,
     onAudioResponseComplete,
     onUsageReport,
+    onSocketClose,
+    onReadyToReceiveAudio,
   });
-
-  const _connectWebSocket = useCallback(async () => {
-    const tokenResponse = await fetch("http://localhost:3000/session");
-    const data = await tokenResponse.json();
-    const EPHEMERAL_KEY = data.client_secret.value;
-    connectWebSocket({ ephemeralKey: EPHEMERAL_KEY });
-  }, [connectWebSocket]);
 
   const ping = useCallback(() => {
     sendBase64AudioStringChunk(dummyBase64Audio16k);
@@ -55,19 +69,44 @@ function App() {
 
   const [chunks, setChunks] = useState<string[]>([]);
 
+  const onAudioStreamerChunk = useCallback(
+    (chunk: string) => {
+      setChunks((prev) => [...prev, chunk]);
+      if (
+        isWebSocketConnected &&
+        isInitialized &&
+        !isAiResponseInProgress &&
+        !isAudioPlayingRef.current
+      ) {
+        console.log("Sending audio chunk:", chunk.slice(0, 50) + "..."); // base64 string
+        sendBase64AudioStringChunk(chunk);
+      }
+    },
+    [
+      isAiResponseInProgress,
+      isInitialized,
+      isWebSocketConnected,
+      sendBase64AudioStringChunk,
+    ]
+  );
+
   const { isStreaming, startStreaming, stopStreaming } = useAudioStreamer({
     sampleRate: 16000, // e.g., 16kHz
     interval: 250, // emit every 250 milliseconds
-    onAudioChunk: (chunk) => {
-      console.log("Got audio chunk:", chunk.slice(0, 50) + "..."); // base64 string
-      setChunks((prev) => [...prev, chunk]);
-    },
+    onAudioChunk: onAudioStreamerChunk,
   });
 
-  const playAudioChunks = () => {
+  const playAudioRecorderChunks = useCallback(() => {
     const combined = combineBase64ArrayList(chunks);
     playAudio({ base64Text: combined, sampleRate: 16000 });
-  };
+  }, [chunks, playAudio]);
+
+  const _connectWebSocket = useCallback(async () => {
+    const tokenResponse = await fetch("http://localhost:3000/session");
+    const data = await tokenResponse.json();
+    const EPHEMERAL_KEY = data.client_secret.value;
+    connectWebSocket({ ephemeralKey: EPHEMERAL_KEY });
+  }, [connectWebSocket]);
 
   return (
     <div
@@ -125,9 +164,13 @@ function App() {
       <hr />
 
       <div className=" flex flex-row items-center gap-2">
-        <button onClick={startStreaming}>Start Streaming</button>
-        <button onClick={stopStreaming}>Stop Streaming</button>
-        <button onClick={playAudioChunks}>Play Stream</button>
+        {!isStreaming && (
+          <button onClick={startStreaming}>Start Streaming</button>
+        )}
+        {isStreaming && <button onClick={stopStreaming}>Stop Streaming</button>}
+        {isStreaming && (
+          <button onClick={playAudioRecorderChunks}>Play Stream</button>
+        )}
         <p>Is Streaming: {isStreaming ? "Yes" : "No"}</p>
       </div>
     </div>
@@ -158,27 +201,15 @@ const useAudioStreamer = ({
   sampleRate,
   interval,
   onAudioChunk,
-  onStartStreaming,
-  onStopStreaming,
 }: {
   sampleRate: number;
   interval: number;
   onAudioChunk: (audioChunk: string) => void;
-  onStartStreaming: () => void;
-  onStopStreaming: () => void;
 }) => {
   const [isStreaming, setIsStreaming] = useState(false);
-  const updateIsStreaming = useCallback(
-    (streaming: boolean) => {
-      setIsStreaming(streaming);
-      if (streaming) {
-        onStartStreaming();
-      } else {
-        onStopStreaming();
-      }
-    },
-    [onStartStreaming, onStopStreaming]
-  );
+  const updateIsStreaming = useCallback((streaming: boolean) => {
+    setIsStreaming(streaming);
+  }, []);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -286,11 +317,9 @@ function base64ToFloat32Array(base64String: string): Float32Array {
 }
 
 const useAudioPlayer = ({
-  onStartAudioPlaying,
-  onStopAudioPlaying,
+  onIsAudioPlayingUpdate,
 }: {
-  onStartAudioPlaying: () => void;
-  onStopAudioPlaying: () => void;
+  onIsAudioPlayingUpdate: (isAudioPlaying: boolean) => void;
 }): {
   isAudioPlaying: boolean;
   playAudio: ({
@@ -306,13 +335,9 @@ const useAudioPlayer = ({
   const updateIsAudioPlaying = useCallback(
     (playing: boolean) => {
       setIsAudioPlaying(playing);
-      if (playing) {
-        onStartAudioPlaying();
-      } else {
-        onStopAudioPlaying();
-      }
+      onIsAudioPlayingUpdate(playing);
     },
-    [onStartAudioPlaying, onStopAudioPlaying]
+    [onIsAudioPlayingUpdate]
   );
 
   const audioContextRef = useRef<AudioContext | null>(null);

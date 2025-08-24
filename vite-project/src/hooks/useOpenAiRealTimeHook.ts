@@ -6,11 +6,17 @@ const useOpenAiRealTime = ({
   onMessageReceived,
   onAudioResponseComplete,
   onUsageReport,
+  onReadyToReceiveAudio,
+  onSocketClose,
+  onSocketError,
 }: {
   instructions: string;
   onMessageReceived: (message: object) => void;
   onAudioResponseComplete: (base64Audio: string) => void;
   onUsageReport: (usage: object) => void;
+  onReadyToReceiveAudio: () => void;
+  onSocketClose: () => void;
+  onSocketError?: (error: any) => void;
 }) => {
   const webSocketRef = useRef<null | WebSocket>(null);
   const [isWebSocketConnecting, setIsWebSocketConnecting] = useState(false);
@@ -54,10 +60,12 @@ const useOpenAiRealTime = ({
           console.log("Disconnected from server.");
           setIsWebSocketConnected(false);
           resetHookState();
+          onSocketClose();
         });
 
         ws.addEventListener("error", (error) => {
           console.error("WebSocket error:", error);
+          onSocketError(error);
         });
 
         ws.addEventListener("message", (event) => {
@@ -86,6 +94,10 @@ const useOpenAiRealTime = ({
           if (messageObject?.response?.usage) {
             onUsageReport(messageObject.response.usage);
           }
+          if (messageObject.type === "session.updated") {
+            setIsInitialized(true);
+            onReadyToReceiveAudio();
+          }
         });
 
         webSocketRef.current = ws;
@@ -95,7 +107,15 @@ const useOpenAiRealTime = ({
         setIsWebSocketConnecting(false);
       }
     },
-    [onAudioResponseComplete, onMessageReceived, onUsageReport, resetHookState]
+    [
+      onAudioResponseComplete,
+      onMessageReceived,
+      onReadyToReceiveAudio,
+      onSocketClose,
+      onSocketError,
+      onUsageReport,
+      resetHookState,
+    ]
   );
 
   const disconnectSocket = useCallback(() => {
@@ -120,7 +140,6 @@ const useOpenAiRealTime = ({
         },
       };
       webSocketRef.current?.send(JSON.stringify(event));
-      setIsInitialized(true);
     }
   }, [instructions, isWebSocketConnected]);
 
